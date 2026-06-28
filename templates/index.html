@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepSeek-Reasonix Issues 报告</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <span>加载中...</span>
+</div>
+
+<div class="topbar">
+    <div class="brand">
+        <span class="brand-icon">🐛</span>
+        <div>
+            <div class="brand-title">DeepSeek-Reasonix Issues</div>
+            <div class="brand-sub">
+                <a href="https://github.com/esengine/DeepSeek-Reasonix" target="_blank">esengine/DeepSeek-Reasonix</a>
+            </div>
+        </div>
+    </div>
+    <div class="top-actions">
+        <button class="btn btn-sm" id="exportBtn">📤 导出标记</button>
+        <button class="btn btn-sm" id="importBtn">📥 导入标记</button>
+        <button class="btn btn-primary" id="refreshBtn">🔄 刷新数据</button>
+    </div>
+</div>
+
+<div class="page-body">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="card">
+            <div class="card-header">📊 概览</div>
+            <div class="card-body">
+                <div class="stats-grid">
+                    <div class="stat-item"><div class="num" id="statTotal" style="color:var(--link)">–</div><div class="lbl">总 Issues</div></div>
+                    <div class="stat-item"><div class="num" id="statBugs" style="color:var(--critical)">–</div><div class="lbl">Bugs</div></div>
+                    <div class="stat-item"><div class="num" id="statEnh" style="color:#8250df">–</div><div class="lbl">增强</div></div>
+                    <div class="stat-item"><div class="num" id="statP0" style="color:var(--critical)">–</div><div class="lbl">P0 致命</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">🔍 筛选</div>
+            <div class="card-body">
+                <div class="filter-section">
+                    <label class="filter-label">关键字</label>
+                    <input type="text" class="filter-input" id="searchInput" placeholder="标题 / 编号 / 作者...">
+                </div>
+                <div class="filter-section">
+                    <label class="filter-label">优先级</label>
+                    <div class="priority-chips" id="priorityChips"></div>
+                </div>
+                <div class="filter-section">
+                    <label class="filter-label">模块</label>
+                    <select class="filter-input" id="categorySelect">
+                        <option value="">全部分类</option>
+                    </select>
+                </div>
+                <div class="filter-section">
+                    <label class="filter-label">标记状态</label>
+                    <select class="filter-input" id="tagSelect">
+                        <option value="">全部状态</option>
+                    </select>
+                </div>
+                <div class="filter-section">
+                    <label class="filter-label">排序</label>
+                    <select class="filter-input" id="sortSelect">
+                        <option value="priority-asc">优先级 高 → 低</option>
+                        <option value="priority-desc">优先级 低 → 高</option>
+                        <option value="updated-desc">最近更新</option>
+                        <option value="created-desc">最近创建</option>
+                        <option value="comments-desc">评论最多</option>
+                    </select>
+                </div>
+                <div class="filter-section">
+                    <label class="filter-label">每页数量</label>
+                    <select class="filter-input" id="pageSizeSelect">
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                    </select>
+                </div>
+                <button class="btn" style="width:100%;margin-top:4px;" id="resetBtn">重置筛选</button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main-content">
+        <div class="charts-row">
+            <div class="card">
+                <div class="card-header">优先级分布</div>
+                <div class="card-body">
+                    <div class="chart-wrap">
+                        <div class="chart-title">优先级分布</div>
+                        <div class="chart-bars" id="priorityChartBars"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">模块分布</div>
+                <div class="card-body">
+                    <div class="chart-wrap">
+                        <div class="chart-title">模块分布 (Bug)</div>
+                        <div class="chart-horizontal" id="categoryChartBars"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">标记状态</div>
+                <div class="card-body">
+                    <div class="chart-wrap">
+                        <div class="chart-title">标记状态</div>
+                        <div class="chart-donut" id="tagDonut"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <span class="toolbar-info">显示 <strong id="showCount">0</strong> / <strong id="totalCount">0</strong> 条</span>
+            <span class="toolbar-hint">💡 默认只展示 P0</span>
+        </div>
+
+        <div id="issueList" class="issue-list"></div>
+        <div id="pagination" class="pagination"></div>
+    </main>
+</div>
+
+<footer>
+    <p>数据来源: GitHub API | 仓库: <a href="https://github.com/esengine/DeepSeek-Reasonix" target="_blank">esengine/DeepSeek-Reasonix</a> | 标记数据存储于 SQLite 数据库</p>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
