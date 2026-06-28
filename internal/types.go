@@ -6,7 +6,7 @@ const (
 	TagNone      = "none"
 	TagFixed     = "fixed"
 	TagFollowing = "following"
-	TagIgnored   = "ignored"
+	TagPlanned   = "planned"
 
 	PriorityP0 = "P0"
 	PriorityP1 = "P1"

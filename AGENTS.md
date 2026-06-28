@@ -22,6 +22,12 @@ go build -o reasonix-bug-report.exe .
 
 # 仅启动服务器（使用已有数据库）
 ./reasonix-bug-report.exe --serve
+
+# 全量拉取（忽略增量时间戳）
+./reasonix-bug-report.exe --fetch --full
+
+# 重新分类已有数据（无需联网）
+./reasonix-bug-report.exe --reclassify --serve
 ```
 
 访问 http://localhost:8765/
@@ -53,13 +59,15 @@ go build -o reasonix-bug-report.exe .
 | `--db` | SQLite 数据库路径 | `data/reasonix.db` |
 | `--fetch` | 仅拉取数据，不启动服务器 | false |
 | `--serve` | 仅启动服务器，跳过数据拉取 | false |
+| `--full` | 强制全量同步（忽略增量时间戳） | false |
+| `--reclassify` | 对已有数据重新分类和评分（无需联网） | false |
 
 ## 功能
 
-- **分类**: Bug 按功能模块细分（Agent 核心、UI 交互、模型供应商、集成插件、配置更新、平台特定）
-- **优先级**: 量化打分（严重性 + 模块关键度 + 活跃度）→ P0/P1/P2/P3
+- **分类**: Issue 按功能模块分类（Agent 核心、UI 交互、模型供应商、集成插件、配置更新、平台特定、其他），通过标签 + 标题关键词双重匹配
+- **优先级**: 量化打分（严重性 + 模块关键度 + 活跃度）→ P0/P1/P2/P3，所有 issue 统一评分
 - **PR 关联**: 自动匹配 Fix/Close/Resolve 关键字和标题相似度
-- **手动标记**: 三种状态（已修复待确认、已有人跟进、已 review），存储于 SQLite
+- **手动标记**: 三种状态（已修复待确认、已有人跟进、计划修复），存储于 SQLite
 - **筛选**: 按优先级、模块、标记状态、关键字搜索
 - **图表**: 优先级分布图、模块分布图、标记状态环形图
 - **导入/导出**: 标记数据 JSON 文件
@@ -74,7 +82,7 @@ go build -o reasonix-bug-report.exe .
 | `/api/stats` | GET | 返回统计数据 |
 | `/api/tags/export` | GET | 导出所有标记为 JSON |
 | `/api/tags/import` | POST | 从 JSON 导入标记 |
-| `/refresh` | POST | 触发后台重新拉取 GitHub 数据 |
+| `/refresh` | POST | 触发后台增量拉取 GitHub 数据 |
 
 ## 数据库 Schema
 
@@ -85,4 +93,27 @@ go build -o reasonix-bug-report.exe .
 
 ## 数据刷新
 
-每天 00:00 的定时任务通过 TRAE 自动化系统调用本工具，实现自动刷新。标记数据（issue_tags）独立于 GitHub 源数据，不会被覆盖。
+手动增量更新：点击页面"刷新数据"按钮或运行 `./reasonix-bug-report.exe --fetch`。标记数据（issue_tags）独立于 GitHub 源数据，不会被覆盖。
+
+## 分类与优先级规则
+
+### 分类（模块）
+
+分类分两级：
+1. **标签匹配**：通过 GitHub labels 直接匹配模块
+2. **关键词匹配**：标签未命中时，通过标题和正文关键词推断
+
+### 优先级（评分）
+
+```
+总分 = 严重性分 + 模块关键度分 + 活跃度分
+
+P0: 总分 >= 14
+P1: 总分 >= 8
+P2: 总分 >= 4
+P3: 总分 < 4
+```
+
+- 严重性分：基于标签（crash/bug/data-loss 等），非 bug issue 为 0
+- 模块关键度分：基于模块重要性
+- 活跃度分：评论数 + 7 日内更新

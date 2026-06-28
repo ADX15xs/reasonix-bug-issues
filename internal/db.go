@@ -188,7 +188,10 @@ func (d *DB) GetStats() (*Stats, error) {
 	s.BugCount = s.CategoryCounts["agent-core"] + s.CategoryCounts["ui-experience"] +
 		s.CategoryCounts["model-provider"] + s.CategoryCounts["integration"] +
 		s.CategoryCounts["config-setup"] + s.CategoryCounts["platform"]
-	s.EnhancementCount = s.CategoryCounts["enhancement"]
+
+	// Count enhancement-labeled issues from labels JSON
+	row = d.db.QueryRow(`SELECT COUNT(*) FROM issues WHERE labels LIKE '%"enhancement"%'`)
+	row.Scan(&s.EnhancementCount)
 
 	return s, nil
 }
@@ -410,6 +413,62 @@ func (d *DB) GetAllIssues() ([]Issue, error) {
 	return issues, nil
 }
 
+func (d *DB) ReclassifyAll() (int, error) {
+	rows, err := d.db.Query("SELECT number, title, COALESCE(body, ''), labels, COALESCE(updated_at, ''), comments FROM issues")
+	if err != nil {
+		return 0, err
+	}
+
+	type rec struct {
+		number, comments int
+		title, body, labelsJSON, updatedAt string
+	}
+	var records []rec
+	for rows.Next() {
+		var r rec
+		if err := rows.Scan(&r.number, &r.title, &r.body, &r.labelsJSON, &r.updatedAt, &r.comments); err != nil {
+			continue
+		}
+		records = append(records, r)
+	}
+	rows.Close()
+
+	updated := 0
+	for _, r := range records {
+		var labels []Label
+		json.Unmarshal([]byte(r.labelsJSON), &labels)
+		labelNames := []string{}
+		for _, l := range labels {
+			labelNames = append(labelNames, strings.ToLower(l.Name))
+		}
+
+		isBug := containsSlice(labelNames, "bug")
+		priority := determinePriority(labelNames, isBug, r.comments, r.updatedAt)
+		category := determineCategory(labelNames, r.title, r.body)
+
+		_, err := d.db.Exec(
+			"UPDATE issues SET priority=?, priority_order=?, category=? WHERE number=?",
+			priority, PriorityOrder[priority], category, r.number,
+		)
+		if err != nil {
+			log.Printf("Reclassify #%d error: %v", r.number, err)
+		} else {
+			updated++
+		}
+	}
+	log.Printf("ReclassifyAll: scanned=%d, updated=%d", len(records), updated)
+	return updated, nil
+}
+
+func containsSlice(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
 func (d *DB) SetMeta(key, value string) error {
 	_, err := d.db.Exec("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", key, value)
 	return err
@@ -424,8 +483,6 @@ func (d *DB) GetMeta(key string) string {
 // Priority order map for sorting
 var PriorityOrder = map[string]int{
 	"P0": 0, "P1": 1, "P2": 2, "P3": 3,
-	"enhancement": 4, "question": 5, "documentation": 6,
-	"dependencies": 7, "other": 8,
 }
 
 func init() {

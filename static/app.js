@@ -1,22 +1,17 @@
 // ─── Constants ───────────────────────────────────────────────────────────────
 const API_BASE = '';
-const ALL_PRIORITIES = ['P0','P1','P2','P3','enhancement','question','documentation','dependencies','other'];
+const ALL_PRIORITIES = ['P0','P1','P2','P3'];
 const PRIORITY_META = {
-    P0:            { label: 'P0 致命', css: 'priority-p0', color: '#cf222e' },
-    P1:            { label: 'P1 高优', css: 'priority-p1', color: '#bf3989' },
-    P2:            { label: 'P2 中优', css: 'priority-p2', color: '#9a6700' },
-    P3:            { label: 'P3 低优', css: 'priority-p3', color: '#6e7781' },
-    enhancement:   { label: '增强', css: 'priority-enhancement', color: '#8250df' },
-    question:      { label: '讨论', css: 'priority-question', color: '#0550ae' },
-    documentation: { label: '文档', css: 'priority-documentation', color: '#0550ae' },
-    dependencies:  { label: '依赖', css: 'priority-other', color: '#6e7781' },
-    other:         { label: '其他', css: 'priority-other', color: '#6e7781' },
+    P0: { label: 'P0 致命', css: 'priority-p0', color: '#cf222e' },
+    P1: { label: 'P1 高优', css: 'priority-p1', color: '#bf3989' },
+    P2: { label: 'P2 中优', css: 'priority-p2', color: '#9a6700' },
+    P3: { label: 'P3 低优', css: 'priority-p3', color: '#6e7781' },
 };
 const TAG_META = {
     none:      { name: '未标记',      css: 'tag-none',      color: '#8b949e' },
-    fixed:     { name: '已修复待确认', css: 'tag-fixed',  color: '#1a7f37' },
-    following: { name: '已有人跟进',  css: 'tag-following', color: '#0550ae' },
-    ignored:   { name: '已 review',  css: 'tag-ignored',   color: '#656d76' },
+    fixed:     { name: '已修复待确认', css: 'tag-fixed',     color: '#1a7f37' },
+    following: { name: '已有人跟进',  css: 'tag-following',  color: '#0550ae' },
+    planned:   { name: '计划修复',    css: 'tag-planned',    color: '#8250df' },
 };
 const BUG_CATEGORIES = {
     'agent-core':     { name: 'Agent 核心',   emoji: '🧠' },
@@ -25,12 +20,6 @@ const BUG_CATEGORIES = {
     'integration':    { name: '集成 & 插件',   emoji: '🔗' },
     'config-setup':   { name: '配置 & 更新',   emoji: '⚙️' },
     'platform':       { name: '平台特定',       emoji: '🏷️' },
-    'enhancement':    { name: '增强',           emoji: '✨' },
-    'documentation':  { name: '文档',           emoji: '📚' },
-    'question':       { name: '讨论',           emoji: '❓' },
-    'dependencies':   { name: '依赖',           emoji: '📦' },
-    'good first issue': { name: 'Good First', emoji: '🌱' },
-    'help wanted':    { name: 'Help Wanted',   emoji: '🙏' },
     'other':          { name: '其他',           emoji: '📋' },
 };
 
@@ -166,7 +155,7 @@ function renderAll(data) {
     renderTagSelect();
     renderPriorityChart(data.stats.priority_counts);
     renderCategoryChart(data.stats.category_counts);
-    renderTagChart(data.stats.total);
+    renderTagChart(data.stats.total_issues);
     renderIssueList(data);
     renderPagination(data.page, data.page_count, data.total);
 }
@@ -230,34 +219,36 @@ function renderPriorityChart(pc) {
 
 function renderCategoryChart(cc) {
     const container = document.getElementById('categoryChartBars');
-    const bugCats = Object.keys(BUG_CATEGORIES).filter(k => (cc[k] || 0) > 0);
-    const max = Math.max(...bugCats.map(k => cc[k] || 0), 1);
-    container.innerHTML = bugCats.map(k => {
-        const cat = BUG_CATEGORIES[k];
-        const cnt = cc[k] || 0;
-        const pct = ((cnt / max) * 100).toFixed(1);
+    const entries = Object.keys(BUG_CATEGORIES)
+        .filter(k => (cc[k] || 0) > 0)
+        .map(k => ({ key: k, count: cc[k] || 0, cat: BUG_CATEGORIES[k] }))
+        .sort((a, b) => b.count - a.count);
+
+    const max = Math.max(...entries.map(e => e.count), 1);
+    container.innerHTML = entries.map(e => {
+        const pct = ((e.count / max) * 100).toFixed(1);
         return `
         <div class="chart-h-row">
-            <div class="chart-h-label" title="${cat.emoji} ${cat.name}">${cat.emoji} ${cat.name}</div>
+            <div class="chart-h-label" title="${e.cat.emoji} ${e.cat.name}">${e.cat.emoji} ${e.cat.name}</div>
             <div class="chart-h-bar-bg">
                 <div class="chart-h-bar" style="width:${pct}%"></div>
             </div>
-            <div class="chart-h-val">${cnt}</div>
+            <div class="chart-h-val">${e.count}</div>
         </div>`;
     }).join('');
 }
 
 function renderTagChart(total) {
     const container = document.getElementById('tagDonut');
-    const cnt = { none: 0, fixed: 0, following: 0, ignored: 0 };
+    const cnt = { none: 0, fixed: 0, following: 0, planned: 0 };
     for (const num in cachedTags) {
         const t = cachedTags[num];
         if (cnt[t] !== undefined) cnt[t]++;
     }
-    const tagged = cnt.fixed + cnt.following + cnt.ignored;
+    const tagged = cnt.fixed + cnt.following + cnt.planned;
     cnt.none = total - tagged;
 
-    const colors = { none: '#d0d7de', fixed: '#1a7f37', following: '#0550ae', ignored: '#656d76' };
+    const colors = { none: '#d0d7de', fixed: '#1a7f37', following: '#0550ae', planned: '#8250df' };
     const radius = 42;
     const circumference = 2 * Math.PI * radius;
     let offset = 0;

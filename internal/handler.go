@@ -106,7 +106,7 @@ func (h *Handler) handleSetTag(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	validTags := map[string]bool{"none": true, "fixed": true, "following": true, "ignored": true}
+	validTags := map[string]bool{"none": true, "fixed": true, "following": true, "planned": true}
 	if !validTags[req.Tag] {
 		http.Error(w, "Invalid tag", http.StatusBadRequest)
 		return

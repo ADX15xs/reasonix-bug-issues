@@ -20,8 +20,8 @@
     --tag-fixed-color: #1a7f37;
     --tag-following-bg: #ddf4ff;
     --tag-following-color: #0550ae;
-    --tag-ignored-bg: #eff1f3;
-    --tag-ignored-color: #656d76;
+    --tag-planned-bg: #f3e8ff;
+    --tag-planned-color: #8250df;
     --shadow: 0 1px 3px rgba(27,31,36,0.12), 0 0 0 1px rgba(27,31,36,0.04);
     --shadow-sm: 0 1px 2px rgba(27,31,36,0.1);
 }
@@ -177,6 +177,7 @@ select.filter-input { cursor: pointer; }
 @media (max-width: 1300px) { .charts-row { grid-template-columns: 1fr; } }
 
 .chart-wrap { display: flex; flex-direction: column; height: 160px; }
+.chart-wrap-tall { min-height: 160px; }
 .chart-title {
     font-size: 12px; font-weight: 600; color: var(--text-muted);
     margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.3px;
@@ -195,7 +196,7 @@ select.filter-input { cursor: pointer; }
 .chart-bar-label { font-size: 10px; color: var(--text-muted); }
 .chart-bar-val { font-size: 11px; font-weight: 700; }
 
-.chart-horizontal { display: flex; flex-direction: column; gap: 7px; flex: 1; justify-content: flex-end; }
+.chart-horizontal { display: flex; flex-direction: column; gap: 7px; flex: 1; justify-content: flex-start; }
 .chart-h-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .chart-h-label {
     width: 80px; text-align: right;
@@ -303,7 +304,7 @@ select.filter-input { cursor: pointer; }
 .tag-current.tag-none { background: var(--tag-none-bg); color: var(--text-muted); border: 1px dashed var(--tag-none-border); }
 .tag-current.tag-fixed { background: var(--tag-fixed-bg); color: var(--tag-fixed-color); }
 .tag-current.tag-following { background: var(--tag-following-bg); color: var(--tag-following-color); }
-.tag-current.tag-ignored { background: var(--tag-ignored-bg); color: var(--tag-ignored-color); }
+.tag-current.tag-planned { background: var(--tag-planned-bg); color: var(--tag-planned-color); }
 
 .tag-btn {
     background: transparent; border: 1px solid var(--border);
@@ -315,7 +316,7 @@ select.filter-input { cursor: pointer; }
 .tag-btn.active { border-color: currentColor; background: rgba(0,0,0,0.04); }
 .tag-btn.active.fixed { border-color: var(--success); color: var(--success); background: var(--tag-fixed-bg); }
 .tag-btn.active.following { border-color: var(--info); color: var(--info); background: var(--tag-following-bg); }
-.tag-btn.active.ignored { border-color: var(--tag-ignored-color); color: var(--tag-ignored-color); background: var(--tag-ignored-bg); }
+.tag-btn.active.planned { border-color: var(--tag-planned-color); color: var(--tag-planned-color); background: var(--tag-planned-bg); }
 
 /* ── Pagination ──────────────────────────────────────────────── */
 .pagination { display: flex; justify-content: center; align-items: center; gap: 4px; margin-top: 20px; flex-wrap: wrap; }
