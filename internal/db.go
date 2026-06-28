@@ -150,6 +150,47 @@ func (d *DB) GetAllTags() (map[int]string, error) {
 	return result, nil
 }
 
+func (d *DB) TagIssuesWithPRs(tag string) (int, error) {
+	var totalPRs int
+	d.db.QueryRow("SELECT COUNT(*) FROM related_prs").Scan(&totalPRs)
+	var totalIssuesWithPRs int
+	d.db.QueryRow("SELECT COUNT(DISTINCT issue_number) FROM related_prs").Scan(&totalIssuesWithPRs)
+	var alreadyTagged int
+	d.db.QueryRow("SELECT COUNT(DISTINCT r.issue_number) FROM related_prs r INNER JOIN issue_tags t ON r.issue_number = t.issue_number WHERE t.tag != ?", TagNone).Scan(&alreadyTagged)
+
+	fmt.Printf("  数据库中 related_prs 总数: %d, 涉及 issue 数: %d, 已标记非 none: %d\n", totalPRs, totalIssuesWithPRs, alreadyTagged)
+
+	rows, err := d.db.Query("SELECT DISTINCT issue_number FROM related_prs")
+	if err != nil {
+		return 0, err
+	}
+	var nums []int
+	for rows.Next() {
+		var num int
+		if err := rows.Scan(&num); err == nil {
+			nums = append(nums, num)
+		}
+	}
+	rows.Close()
+
+	now := time.Now().Format(time.RFC3339)
+	count := 0
+	for _, num := range nums {
+		var currentTag string
+		err := d.db.QueryRow("SELECT tag FROM issue_tags WHERE issue_number = ?", num).Scan(&currentTag)
+		if err == sql.ErrNoRows || currentTag == TagNone {
+			_, err := d.db.Exec(`
+				INSERT INTO issue_tags (issue_number, tag, updated_at) VALUES (?, ?, ?)
+				ON CONFLICT(issue_number) DO UPDATE SET tag=excluded.tag, updated_at=excluded.updated_at
+			`, num, tag, now)
+			if err == nil {
+				count++
+			}
+		}
+	}
+	return count, nil
+}
+
 func (d *DB) GetStats() (*Stats, error) {
 	s := &Stats{
 		PriorityCounts: make(map[string]int),

@@ -58,9 +58,10 @@ async function fetchPage() {
     try {
         const data = await api('/api/issues?' + params.toString());
         statsData = data.stats;
+        const allTags = await api('/api/tags/export');
         cachedTags = {};
-        for (const item of data.items) {
-            if (item.tag && item.tag !== 'none') cachedTags[item.number] = item.tag;
+        for (const num in allTags) {
+            if (allTags[num] !== 'none') cachedTags[num] = allTags[num];
         }
         renderAll(data);
     } catch (e) {

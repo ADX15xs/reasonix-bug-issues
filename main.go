@@ -18,6 +18,7 @@ var (
 	fetchOnly  = flag.Bool("fetch", false, "Only fetch data, do not start server")
 	fullSync   = flag.Bool("full", false, "Force full sync (ignore last_fetch)")
 	reclassify = flag.Bool("reclassify", false, "Re-classify all existing issues in DB using current logic")
+	tagPRs     = flag.Bool("tag-prs", false, "Tag all issues with related PRs as 'following' (已有人跟进)")
 )
 
 func main() {
@@ -40,6 +41,20 @@ func main() {
 			log.Fatalf("Reclassify error: %v", err)
 		}
 		fmt.Printf("  已更新 %d 条 issue\n", n)
+	}
+
+	if *tagPRs {
+		fmt.Println("[标记 PR 关联 issue] 正在将有关联 PR 的 issue 标记为已有人跟进...")
+		n, err := db.TagIssuesWithPRs("following")
+		if err != nil {
+			log.Fatalf("TagPRs error: %v", err)
+		}
+		fmt.Printf("  已标记 %d 条 issue\n", n)
+	}
+
+	standalone := *tagPRs && !*serveOnly && !*fetchOnly
+	if standalone {
+		return
 	}
 
 	fetchFunc := func() error {
