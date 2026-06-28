@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -221,6 +223,10 @@ func fetchGitHubWithLink(url string) ([]byte, string, error) {
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 	req.Header.Set("User-Agent", "Reasonix-Bug-Report-Generator")
 
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
 	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -231,6 +237,14 @@ func fetchGitHubWithLink(url string) ([]byte, string, error) {
 	if resp.StatusCode == 304 {
 		return nil, "", nil
 	}
+
+	// Log rate limit info for debugging
+	remaining := resp.Header.Get("X-RateLimit-Remaining")
+	if remaining == "0" {
+		reset := resp.Header.Get("X-RateLimit-Reset")
+		log.Printf("GitHub API rate limit exhausted! Reset at: %s", reset)
+	}
+
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, "", fmt.Errorf("GitHub API error %d: %s", resp.StatusCode, string(body))

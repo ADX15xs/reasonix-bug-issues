@@ -19,10 +19,21 @@ var (
 	fullSync   = flag.Bool("full", false, "Force full sync (ignore last_fetch)")
 	reclassify = flag.Bool("reclassify", false, "Re-classify all existing issues in DB using current logic")
 	tagPRs     = flag.Bool("tag-prs", false, "Tag all issues with related PRs as 'following' (已有人跟进)")
+	stateFlag  = flag.String("state", "open", "Issue state to fetch: open, closed, all")
 )
 
 func main() {
 	flag.Parse()
+
+	internal.LoadDotenv()
+
+	token := os.Getenv("GITHUB_TOKEN")
+	if token != "" {
+		fmt.Println("[GitHub Token] 已检测到 GITHUB_TOKEN，API 限额提升至 5000 次/小时")
+	} else {
+		fmt.Println("[GitHub Token] 未设置 GITHUB_TOKEN，使用未认证模式（60 次/小时）")
+		fmt.Println("  提示：创建 .env 文件并设置 GITHUB_TOKEN 可大幅提高 API 限额")
+	}
 
 	if err := os.MkdirAll("data", 0755); err != nil {
 		log.Fatalf("Create data dir: %v", err)
@@ -104,9 +115,9 @@ func sync(db *internal.DB) error {
 		}
 	}
 
-	fmt.Printf("Fetching %s issues from GitHub...\n", mode)
+	fmt.Printf("Fetching %s issues from GitHub (state=%s)...\n", mode, *stateFlag)
 	ghIssues, err := internal.FetchIssues(internal.FetchIssuesParams{
-		State: "all",
+		State: *stateFlag,
 		Since: since,
 	})
 	if err != nil {
