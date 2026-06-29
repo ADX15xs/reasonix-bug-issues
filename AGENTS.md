@@ -28,6 +28,12 @@ go build -o reasonix-bug-report.exe .
 
 # 重新分类已有数据（无需联网）
 ./reasonix-bug-report.exe --reclassify --serve
+
+# 自动标记有关联 PR 的 issue 为"已有人跟进"
+./reasonix-bug-report.exe --tag-prs --serve
+
+# 指定 issue 状态拉取（默认 open）
+./reasonix-bug-report.exe --fetch --state open
 ```
 
 访问 http://localhost:8765/
@@ -41,13 +47,15 @@ go build -o reasonix-bug-report.exe .
 │   ├── types.go      # 数据结构
 │   ├── db.go         # SQLite 操作
 │   ├── github.go     # GitHub API 获取与分类
-│   └── handler.go    # HTTP 路由与 API 处理器
+│   ├── handler.go    # HTTP 路由与 API 处理器
+│   └── dotenv.go     # .env 文件解析
 ├── templates/
 │   └── index.html    # HTML 模板（引用 /static/）
 ├── static/
 │   ├── style.css     # 样式（亮色主题）
 │   └── app.js        # 前端交互逻辑
 ├── data/             # SQLite 数据库文件（自动创建）
+├── .env.example      # GITHUB_TOKEN 配置示例
 └── .gitignore
 ```
 
@@ -61,6 +69,8 @@ go build -o reasonix-bug-report.exe .
 | `--serve` | 仅启动服务器，跳过数据拉取 | false |
 | `--full` | 强制全量同步（忽略增量时间戳） | false |
 | `--reclassify` | 对已有数据重新分类和评分（无需联网） | false |
+| `--tag-prs` | 自动标记有关联 PR 的 issue 为"已有人跟进" | false |
+| `--state` | 拉取 issue 状态（open / closed / all） | open |
 
 ## 功能
 

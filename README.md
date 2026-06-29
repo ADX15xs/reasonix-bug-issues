@@ -29,7 +29,27 @@ go build -o reasonix-bug-report.exe .
 
 # 更新分类逻辑后重新分类已有数据（无需联网）
 ./reasonix-bug-report.exe --reclassify --serve
+
+# 自动标记有关联 PR 的 issue 为"已有人跟进"
+./reasonix-bug-report.exe --tag-prs --serve
+
+# 指定 issue 状态拉取（默认 open，可选 closed / all）
+./reasonix-bug-report.exe --fetch --state open
 ```
+
+## 配置
+
+支持 `.env` 文件配置 GITHUB_TOKEN（可选）：
+
+```bash
+# 复制示例文件
+cp .env.example .env
+
+# 编辑 .env，填入你的 GitHub Token
+GITHUB_TOKEN=ghp_xxxxxxxxxxxx
+```
+
+Token 用于提升 GitHub API 请求频率限制。未配置 Token 时仍可使用，但可能遇到限速。
 
 ## 功能
 
