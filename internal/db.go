@@ -226,9 +226,9 @@ func (d *DB) GetStats() (*Stats, error) {
 		}
 	}
 
-	s.BugCount = s.CategoryCounts["agent-core"] + s.CategoryCounts["ui-experience"] +
-		s.CategoryCounts["model-provider"] + s.CategoryCounts["integration"] +
-		s.CategoryCounts["config-setup"] + s.CategoryCounts["platform"]
+	// Count bug-labeled issues from labels JSON
+	row = d.db.QueryRow(`SELECT COUNT(*) FROM issues WHERE labels LIKE '%"bug"%'`)
+	row.Scan(&s.BugCount)
 
 	// Count enhancement-labeled issues from labels JSON
 	row = d.db.QueryRow(`SELECT COUNT(*) FROM issues WHERE labels LIKE '%"enhancement"%'`)
