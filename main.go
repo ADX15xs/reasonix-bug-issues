@@ -115,23 +115,16 @@ func sync(db *internal.DB) error {
 		}
 	}
 
-	fmt.Printf("Fetching %s issues from GitHub (state=%s)...\n", mode, *stateFlag)
-	ghIssues, err := internal.FetchIssues(internal.FetchIssuesParams{
+	fmt.Printf("Fetching %s issues+PRs from GitHub (state=%s)...\n", mode, *stateFlag)
+	ghIssues, ghPRs, err := internal.FetchIssuesAndPRs(internal.FetchIssuesParams{
 		State: *stateFlag,
 		Since: since,
 	})
 	if err != nil {
-		return fmt.Errorf("FetchIssues: %v", err)
+		return fmt.Errorf("FetchIssuesAndPRs: %v", err)
 	}
 
-	fmt.Printf("  Fetched %d issues\n", len(ghIssues))
-
-	fmt.Println("Fetching PRs from GitHub...")
-	ghPRs, err := internal.FetchAllPRs("open")
-	if err != nil {
-		return fmt.Errorf("FetchAllPRs: %v", err)
-	}
-	fmt.Printf("  Fetched %d PRs\n", len(ghPRs))
+	fmt.Printf("  Fetched %d issues, %d PRs (single endpoint, split client-side)\n", len(ghIssues), len(ghPRs))
 
 	fmt.Println("Storing issues in database...")
 	upserted := 0

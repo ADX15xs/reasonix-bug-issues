@@ -149,6 +149,14 @@ type GitHubIssue struct {
 		Name  string `json:"name"`
 		Color string `json:"color"`
 	} `json:"labels"`
+	PullRequest *PullRequestRef `json:"pull_request,omitempty"`
+}
+
+type PullRequestRef struct {
+	URL      string `json:"url"`
+	HTMLURL  string `json:"html_url"`
+	DiffURL  string `json:"diff_url"`
+	PatchURL string `json:"patch_url"`
 }
 
 type GitHubPR struct {
@@ -166,9 +174,10 @@ type FetchIssuesParams struct {
 	Since string // RFC3339 timestamp; if set, only issues updated after this time are returned
 }
 
-func FetchIssues(params FetchIssuesParams) ([]GitHubIssue, error) {
-	var all []GitHubIssue
-	url := fmt.Sprintf("%s/repos/%s/%s/issues?state=%s&per_page=100&pull_requests=false",
+func FetchIssuesAndPRs(params FetchIssuesParams) ([]GitHubIssue, []GitHubPR, error) {
+	var issues []GitHubIssue
+	var prs []GitHubPR
+	url := fmt.Sprintf("%s/repos/%s/%s/issues?state=%s&per_page=100",
 		GitHubAPI, RepoOwner, RepoName, params.State)
 	if params.Since != "" {
 		url += "&since=" + params.Since
@@ -177,45 +186,43 @@ func FetchIssues(params FetchIssuesParams) ([]GitHubIssue, error) {
 	for url != "" {
 		data, nextURL, err := fetchGitHubWithLink(url)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if len(data) == 0 {
 			break
 		}
-		var issues []GitHubIssue
-		if err := json.Unmarshal(data, &issues); err != nil {
-			return nil, err
+		var items []GitHubIssue
+		if err := json.Unmarshal(data, &items); err != nil {
+			return nil, nil, err
 		}
-		if len(issues) == 0 {
+		if len(items) == 0 {
 			break
 		}
-		all = append(all, issues...)
+		for _, it := range items {
+			if IsPullRequest(it) {
+				prs = append(prs, ToGitHubPR(it))
+			} else {
+				issues = append(issues, it)
+			}
+		}
 		url = nextURL
 	}
-	return all, nil
+	return issues, prs, nil
 }
 
-func FetchAllPRs(state string) ([]GitHubPR, error) {
-	var all []GitHubPR
-	url := fmt.Sprintf("%s/repos/%s/%s/pulls?state=%s&per_page=100",
-		GitHubAPI, RepoOwner, RepoName, state)
+func IsPullRequest(ghIss GitHubIssue) bool {
+	return ghIss.PullRequest != nil
+}
 
-	for url != "" {
-		data, nextURL, err := fetchGitHubWithLink(url)
-		if err != nil {
-			return nil, err
-		}
-		if len(data) == 0 {
-			break
-		}
-		var prs []GitHubPR
-		if err := json.Unmarshal(data, &prs); err != nil {
-			return nil, err
-		}
-		all = append(all, prs...)
-		url = nextURL
+func ToGitHubPR(ghIss GitHubIssue) GitHubPR {
+	return GitHubPR{
+		Number:    ghIss.Number,
+		Title:     ghIss.Title,
+		HTMLURL:   ghIss.HTMLURL,
+		Body:      ghIss.Body,
+		State:     ghIss.State,
+		UpdatedAt: ghIss.UpdatedAt,
 	}
-	return all, nil
 }
 
 func fetchGitHubWithLink(url string) ([]byte, string, error) {
