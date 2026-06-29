@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -177,14 +178,17 @@ type FetchIssuesParams struct {
 func FetchIssuesAndPRs(params FetchIssuesParams) ([]GitHubIssue, []GitHubPR, error) {
 	var issues []GitHubIssue
 	var prs []GitHubPR
-	url := fmt.Sprintf("%s/repos/%s/%s/issues?state=%s&per_page=100",
-		GitHubAPI, RepoOwner, RepoName, params.State)
+	query := url.Values{}
+	query.Set("state", params.State)
+	query.Set("per_page", "100")
 	if params.Since != "" {
-		url += "&since=" + params.Since
+		query.Set("since", params.Since)
 	}
+	apiURL := fmt.Sprintf("%s/repos/%s/%s/issues?%s",
+		GitHubAPI, RepoOwner, RepoName, query.Encode())
 
-	for url != "" {
-		data, nextURL, err := fetchGitHubWithLink(url)
+	for apiURL != "" {
+		data, nextURL, err := fetchGitHubWithLink(apiURL)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -205,7 +209,7 @@ func FetchIssuesAndPRs(params FetchIssuesParams) ([]GitHubIssue, []GitHubPR, err
 				issues = append(issues, it)
 			}
 		}
-		url = nextURL
+		apiURL = nextURL
 	}
 	return issues, prs, nil
 }
