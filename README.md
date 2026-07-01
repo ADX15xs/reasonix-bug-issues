@@ -12,12 +12,9 @@ go build -o reasonix-bug-report.exe .
 
 浏览器访问 http://localhost:8765/
 
-## 使用方式
+## 常用命令
 
 ```bash
-# 首次运行：拉取数据 + 启动服务
-./reasonix-bug-report.exe
-
 # 仅拉取增量数据
 ./reasonix-bug-report.exe --fetch
 
@@ -33,51 +30,49 @@ go build -o reasonix-bug-report.exe .
 # 自动标记有关联 PR 的 issue 为"已有人跟进"
 ./reasonix-bug-report.exe --tag-prs --serve
 
-# 指定 issue 状态拉取（默认 open，可选 closed / all）
+# 指定保留的 issue 状态（默认 open，可选 closed / all）
 ./reasonix-bug-report.exe --fetch --state open
 ```
 
 ## 配置
 
-支持 `.env` 文件配置 GITHUB_TOKEN（可选）：
+支持 `.env` 文件配置 `GITHUB_TOKEN`（可选）：
 
 ```bash
-# 复制示例文件
 cp .env.example .env
-
 # 编辑 .env，填入你的 GitHub Token
 GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 ```
 
-Token 用于提升 GitHub API 请求频率限制。未配置 Token 时仍可使用，但可能遇到限速。
+Token 用于提升 GitHub API 请求频率限制。未配置时仍可使用，但可能遇到限速。
 
 ## 功能
 
-- **分类**：Issue 按 6 个功能模块自动分类（Agent 核心、UI 交互、模型供应商、集成插件、配置更新、平台特定），通过 GitHub 标签 + 标题关键词双重匹配
-- **优先级**：量化评分 → P0/P1/P2/P3，所有 issue 统一算法
+- **分类**：按 6 个功能模块自动分类（标签 + 标题关键词双重匹配）
+- **优先级**：量化评分 → P0/P1/P2/P3
 - **PR 关联**：自动匹配关联的 Pull Request
 - **手动标记**：已修复待确认、已有人跟进、计划修复
-- **筛选**：按优先级、模块、标记状态、关键字搜索
-- **图表**：优先级分布、模块分布、标记状态环形图
+- **筛选 & 图表**：按优先级 / 模块 / 标记 / 关键字筛选，含分布图与环形图
 - **导入/导出**：标记数据 JSON 备份
 
-## 数据更新
+## 数据更新行为
 
-- 点击页面"刷新数据"按钮触发增量拉取
-- 标记数据独立于 GitHub 源数据，不会因刷新覆盖
-- 增量同步基于 GitHub API `since` 参数，只拉取变化的 issue
+- 点击页面"刷新数据"按钮或 `--fetch` 触发增量拉取
+- 增量同步始终以 `state=all` + `since` 拉取，能感知 issue 关闭事件
+- 同步后自动清理 DB 中状态不匹配 `--state` 的 issue（默认清理已关闭项）；全量同步还会回收 GitHub 上已删除的 issue
+- 标记数据（`issue_tags`）独立于 GitHub 源数据，不会因刷新覆盖
 
 ## 技术栈
 
-Go 1.21+ · SQLite · 原生 HTML/CSS/JavaScript
+Go 1.21+ · SQLite (`modernc.org/sqlite`) · 原生 HTML/CSS/JavaScript
 
 ## 目录结构
 
 ```
 .
-├── main.go           # 入口
-├── internal/         # Go 后端
+├── main.go           # 入口：CLI + HTTP 服务器
+├── internal/         # Go 后端（types / db / github / handler / dotenv）
 ├── templates/        # HTML 模板
 ├── static/           # CSS / JS
-└── data/             # SQLite 数据库
+└── data/             # SQLite 数据库（自动创建）
 ```

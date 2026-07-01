@@ -32,7 +32,7 @@ go build -o reasonix-bug-report.exe .
 # 自动标记有关联 PR 的 issue 为"已有人跟进"
 ./reasonix-bug-report.exe --tag-prs --serve
 
-# 指定 issue 状态拉取（默认 open）
+# 指定保留的 issue 状态（默认 open，同步会清理已关闭 issue）
 ./reasonix-bug-report.exe --fetch --state open
 ```
 
@@ -70,7 +70,7 @@ go build -o reasonix-bug-report.exe .
 | `--full` | 强制全量同步（忽略增量时间戳） | false |
 | `--reclassify` | 对已有数据重新分类和评分（无需联网） | false |
 | `--tag-prs` | 自动标记有关联 PR 的 issue 为"已有人跟进" | false |
-| `--state` | 拉取 issue 状态（open / closed / all） | open |
+| `--state` | 保留 issue 状态（open / closed / all）；同步始终用 state=all 拉取以感知关闭，再清理不匹配项 | open |
 
 ## 功能
 
@@ -96,14 +96,14 @@ go build -o reasonix-bug-report.exe .
 
 ## 数据库 Schema
 
-- `issues`: id, number, title, html_url, body, user_login, user_avatar, created_at, updated_at, comments, labels(JSON), priority, priority_order, category
+- `issues`: id, number, title, html_url, body, state, user_login, user_avatar, created_at, updated_at, comments, labels(JSON), priority, priority_order, category
 - `related_prs`: id, issue_number, pr_number, pr_title, pr_html_url
 - `issue_tags`: issue_number(PK), tag, updated_at
 - `meta`: key(PK), value
 
 ## 数据刷新
 
-手动增量更新：点击页面"刷新数据"按钮或运行 `./reasonix-bug-report.exe --fetch`。标记数据（issue_tags）独立于 GitHub 源数据，不会被覆盖。
+手动增量更新：点击页面"刷新数据"按钮或运行 `./reasonix-bug-report.exe --fetch`。增量同步始终以 `state=all` + `since` 拉取（关闭时 `updated_at` 会变，必然被命中），从而感知 issue 关闭事件；同步后自动清理 DB 中状态不匹配 `--state` 的 issue，全量同步还会回收 GitHub 上已删除的 issue。标记数据（issue_tags）独立于 GitHub 源数据，不会被覆盖。
 
 ## 分类与优先级规则
 
