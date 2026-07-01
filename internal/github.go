@@ -310,6 +310,7 @@ func ToInternalIssue(ghIss GitHubIssue) Issue {
 		Title:         ghIss.Title,
 		HTMLURL:       ghIss.HTMLURL,
 		Body:          ghIss.Body,
+		State:         ghIss.State,
 		UserLogin:     ghIss.User.Login,
 		UserAvatar:    ghIss.User.AvatarURL,
 		CreatedAt:     createdAt,

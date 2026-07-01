@@ -20,6 +20,7 @@ type Issue struct {
 	Title       string    `json:"title"`
 	HTMLURL     string    `json:"html_url"`
 	Body        string    `json:"body,omitempty"`
+	State       string    `json:"state"`
 	UserLogin   string    `json:"user_login"`
 	UserAvatar  string    `json:"user_avatar"`
 	CreatedAt   time.Time `json:"created_at"`

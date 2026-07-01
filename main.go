@@ -95,29 +95,32 @@ func main() {
 }
 
 // sync performs a full or incremental sync based on last_fetch timestamp.
+//
+// To detect closures, we always fetch with state=all (+ since for incremental).
+// Otherwise state=open + since would never return issues that just got closed,
+// and they would accumulate in the DB forever. The --state flag now controls
+// which state is *kept* in the DB: issues whose state does not match are pruned
+// after the upsert. A full sync additionally drops issues that no longer exist
+// on GitHub.
 func sync(db *internal.DB) error {
 	var since string
 	if !*fullSync {
 		since = db.GetMeta("last_fetch")
 	}
 
-	var mode string
-	if since == "" {
-		mode = "全量"
+	isFullSync := since == ""
+	if _, err := time.Parse(time.RFC3339, since); err != nil {
+		isFullSync = true
+		fmt.Printf("[全量同步] (上次时间戳无效: %s)\n", since)
+	} else if isFullSync {
 		fmt.Println("[全量同步]")
 	} else {
-		mode = "增量"
-		if _, err := time.Parse(time.RFC3339, since); err != nil {
-			mode = "全量"
-			fmt.Printf("[全量同步] (上次时间戳无效: %s)\n", since)
-		} else {
-			fmt.Printf("[增量同步] since=%s\n", since)
-		}
+		fmt.Printf("[增量同步] since=%s\n", since)
 	}
 
-	fmt.Printf("Fetching %s issues+PRs from GitHub (state=%s)...\n", mode, *stateFlag)
+	fmt.Printf("Fetching issues+PRs from GitHub (fetch state=all, keep state=%s)...\n", *stateFlag)
 	ghIssues, ghPRs, err := internal.FetchIssuesAndPRs(internal.FetchIssuesParams{
-		State: *stateFlag,
+		State: "all",
 		Since: since,
 	})
 	if err != nil {
@@ -128,21 +131,54 @@ func sync(db *internal.DB) error {
 
 	fmt.Println("Storing issues in database...")
 	upserted := 0
+	fetchedNumbers := make([]int, 0, len(ghIssues))
 	for _, ghIss := range ghIssues {
 		iss := internal.ToInternalIssue(ghIss)
+		fetchedNumbers = append(fetchedNumbers, iss.Number)
 		if err := db.UpsertIssue(&iss); err != nil {
 			log.Printf("UpsertIssue #%d error: %v", iss.Number, err)
 			continue
 		}
 		upserted++
 
-		prs := internal.FindRelatedPRs(iss.Number, iss.Title, ghPRs)
-		db.ClearRelatedPRs(iss.Number)
-		for _, pr := range prs {
-			db.InsertRelatedPR(iss.Number, &pr)
+		// Only link PRs for issues we are going to keep; closed issues (when
+		// state=open) will be pruned below, so skip the work.
+		if *stateFlag == "all" || iss.State == *stateFlag {
+			prs := internal.FindRelatedPRs(iss.Number, iss.Title, ghPRs)
+			db.ClearRelatedPRs(iss.Number)
+			for _, pr := range prs {
+				db.InsertRelatedPR(iss.Number, &pr)
+			}
 		}
 	}
 	fmt.Printf("  Upserted %d issues\n", upserted)
+
+	// Prune issues whose state does not match the desired --state.
+	if *stateFlag != "all" {
+		n, err := db.DeleteIssuesNotInState(*stateFlag)
+		if err != nil {
+			log.Printf("DeleteIssuesNotInState error: %v", err)
+		} else if n > 0 {
+			fmt.Printf("  Pruned %d issues not in state=%s (e.g. closed)\n", n, *stateFlag)
+		}
+	}
+
+	// On a full sync, also drop issues that no longer exist on GitHub.
+	if isFullSync {
+		n, err := db.DeleteIssuesNotInNumbers(fetchedNumbers)
+		if err != nil {
+			log.Printf("DeleteIssuesNotInNumbers error: %v", err)
+		} else if n > 0 {
+			fmt.Printf("  Pruned %d issues no longer present on GitHub\n", n)
+		}
+	}
+
+	// Tidy up any related_prs rows left dangling by the deletions above.
+	if n, err := db.CleanupOrphanedPRs(); err != nil {
+		log.Printf("CleanupOrphanedPRs error: %v", err)
+	} else if n > 0 {
+		fmt.Printf("  Cleaned %d orphaned related_prs rows\n", n)
+	}
 
 	now := time.Now().Format(time.RFC3339)
 	db.SetMeta("last_fetch", now)

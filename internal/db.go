@@ -42,6 +42,7 @@ func (d *DB) migrate() error {
 		title TEXT NOT NULL,
 		html_url TEXT NOT NULL,
 		body TEXT DEFAULT '',
+		state TEXT NOT NULL DEFAULT 'open',
 		user_login TEXT NOT NULL,
 		user_avatar TEXT NOT NULL,
 		created_at TEXT NOT NULL,
@@ -77,23 +78,59 @@ func (d *DB) migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_issues_priority ON issues(priority);
 	CREATE INDEX IF NOT EXISTS idx_issues_category ON issues(category);
 	CREATE INDEX IF NOT EXISTS idx_issues_updated ON issues(updated_at);
+	CREATE INDEX IF NOT EXISTS idx_issues_state ON issues(state);
 	`
 	_, err := d.db.Exec(schema)
+	if err != nil {
+		return err
+	}
+
+	if err := d.ensureColumn("issues", "state", "TEXT NOT NULL DEFAULT 'open'"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ensureColumn adds a column to a table if it does not already exist.
+func (d *DB) ensureColumn(table, column, decl string) error {
+	rows, err := d.db.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == column {
+			return nil
+		}
+	}
+	_, err = d.db.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, decl))
 	return err
 }
 
 func (d *DB) UpsertIssue(issue *Issue) error {
 	labelsJSON, _ := json.Marshal(issue.Labels)
+	state := issue.State
+	if state == "" {
+		state = "open"
+	}
 	_, err := d.db.Exec(`
-		INSERT INTO issues (id, number, title, html_url, body, user_login, user_avatar, created_at, updated_at, comments, labels, priority, priority_order, category)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO issues (id, number, title, html_url, body, state, user_login, user_avatar, created_at, updated_at, comments, labels, priority, priority_order, category)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(number) DO UPDATE SET
 			title=excluded.title, html_url=excluded.html_url, body=excluded.body,
+			state=excluded.state,
 			user_login=excluded.user_login, user_avatar=excluded.user_avatar,
 			updated_at=excluded.updated_at, comments=excluded.comments,
 			labels=excluded.labels, priority=excluded.priority,
 			priority_order=excluded.priority_order, category=excluded.category
-	`, issue.ID, issue.Number, issue.Title, issue.HTMLURL, issue.Body,
+	`, issue.ID, issue.Number, issue.Title, issue.HTMLURL, issue.Body, state,
 		issue.UserLogin, issue.UserAvatar, issue.CreatedAt.Format(time.RFC3339),
 		issue.UpdatedAt.Format(time.RFC3339), issue.Comments, string(labelsJSON),
 		issue.Priority, issue.PriorityOrder, issue.Category)
@@ -110,6 +147,53 @@ func (d *DB) InsertRelatedPR(issueNumber int, pr *RelatedPR) error {
 		"INSERT INTO related_prs (issue_number, pr_number, pr_title, pr_html_url) VALUES (?, ?, ?, ?)",
 		issueNumber, pr.Number, pr.Title, pr.HTMLURL)
 	return err
+}
+
+// DeleteIssuesNotInState removes issues whose state does not match keepState.
+// Used to drop closed issues when the user only wants open ones (and vice versa).
+func (d *DB) DeleteIssuesNotInState(keepState string) (int64, error) {
+	res, err := d.db.Exec("DELETE FROM issues WHERE state != ?", keepState)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}
+
+// DeleteIssuesNotInNumbers removes issues whose number is not in keepNumbers.
+// Used during a full sync to drop issues that no longer exist on GitHub.
+func (d *DB) DeleteIssuesNotInNumbers(keepNumbers []int) (int64, error) {
+	if len(keepNumbers) == 0 {
+		res, err := d.db.Exec("DELETE FROM issues")
+		if err != nil {
+			return 0, err
+		}
+		n, _ := res.RowsAffected()
+		return n, nil
+	}
+	placeholders := make([]string, len(keepNumbers))
+	args := make([]interface{}, len(keepNumbers))
+	for i, num := range keepNumbers {
+		placeholders[i] = "?"
+		args[i] = num
+	}
+	q := fmt.Sprintf("DELETE FROM issues WHERE number NOT IN (%s)", strings.Join(placeholders, ","))
+	res, err := d.db.Exec(q, args...)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}
+
+// CleanupOrphanedPRs removes related_prs rows whose issue_number no longer exists in issues.
+func (d *DB) CleanupOrphanedPRs() (int64, error) {
+	res, err := d.db.Exec("DELETE FROM related_prs WHERE issue_number NOT IN (SELECT number FROM issues)")
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
 }
 
 func (d *DB) SetIssueTag(number int, tag string) error {
